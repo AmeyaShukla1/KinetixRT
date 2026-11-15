@@ -212,3 +212,92 @@ lies within the event windows, which caps what phase-based saving can achieve.
 
 Reproducibility: 12 episodes that ran twice in independent processes produced
 identical step counts, inference counts and outcomes.
+
+### 5.2 E2 — slow inference with a contention window (latency model: `calibrated` + disturbance)
+
+Here the control loop *is* charged for inference. The latency model is the linear
+CPU fit from §4 (0.82 s for 3 steps, 1.32 s for 10 steps, i.e. 17 and 27 control
+ticks), multiplied by 2.5 for every inference started between t = 1 s and
+t = 7 s (2.06 s and 3.30 s). This is a deliberately hostile regime: a 50-action
+chunk lasts 2.5 s, so during the window not even the cheapest budget can keep
+the buffer covered. The robot holds still (zero motion, gripper held) whenever
+it has no valid action.
+
+Because the default presets assume fast inference, the controllers were given
+horizons suited to ~1 s latency (`scripts/e2_overrides.json`): fixed controllers
+and `runtime_only` refresh every 25 actions; `physical_aware` uses 5 steps /
+H = 40 when calm and 3 steps / H = 10 near gripper events. Tasks 0–9 × initial
+states 0, 1. Files: `results/raw/e2_edge_shard*.jsonl`, `results/e2_edge.md`.
+
+| controller | episodes | success (95% CI) | ticks without a valid action / episode | start-up wait (ticks) | share of ticks driven by a plan | mean action age (ticks) | steps used |
+|---|---|---|---|---|---|---|---|
+| `fixed_high` | 20 | 30.0% (15–52) | 88.0 | 27 | 55% | 51 | 10 |
+| `fixed_reduced_steps` | 20 | 35.0% (18–57) | 40.8 | 17 | 76% | 41 | 3 |
+| `runtime_only` | 20 | 30.0% (15–52) | 40.9 | 27 | 72% | 43 | 3 (89%), 10 (11%) |
+| `physical_aware` | 20 | 20.0% (8–42) | 45.9 | 20 | 73% | 41 | 3 (79%), 5 (21%) |
+
+Paired against `fixed_high`: `fixed_reduced_steps` 3 wins / 2 losses,
+`runtime_only` 3 / 3, `physical_aware` 2 / 4 (all p ≥ 0.69).
+
+What this shows:
+
+* **The runtime behaves as designed under overload.** Every `fixed_high` episode
+  had a stale result rejected and spent 88 ticks (4.4 s) without a valid action.
+  Controllers that lower the step count when the deadline cannot be met halved
+  that (41–46 ticks). No episode produced a non-finite or out-of-range command;
+  the fallback and re-anchoring paths were exercised in every episode.
+* **That did not turn into a measurable success difference.** All four
+  controllers succeed in 20–35% of episodes (versus ~50% in E1), and the
+  differences are within noise. When inference takes 17–66 control ticks, every
+  controller executes actions that are on average 40–50 ticks old, and that is
+  what hurts.
+* **Physical signals added nothing here.** `runtime_only` and a fixed 3-step
+  budget do as well as `physical_aware`, whose nominal success is the lowest.
+  Under a binding latency constraint the deadline logic picks the cheapest
+  budget almost always, and the phase rules have no room to act.
+
+### 5.3 E3 — dynamic scene: the object to be grasped is displaced (latency model: `zero`)
+
+At tick 20, while the arm is approaching, the object of interest is moved 5 cm
+sideways. The displacement is applied to the simulator state; the runtime sees
+it only through the camera images. Initial state 0. The run was **stopped after
+tasks 0–4** because the outcome made further episodes uninformative (see below).
+Files: `results/raw/e3_dynamic_shard*.jsonl`, `results/e3_dynamic.md`.
+
+| controller | episodes | successes | same episodes without displacement (E1) | episodes in which the plan was invalidated | ticks from displacement to invalidation |
+|---|---|---|---|---|---|
+| `fixed_high` | 5 (+1 on task 5) | 0 (+1) | 3 of 5 | n/a | n/a |
+| `physical_aware` | 5 | 0 | 4 of 5 | 5 of 5 | 2 in every episode |
+| `physical_no_scene` (ablation) | 4 | 0 | n/a | 0 of 4 | n/a |
+
+What this shows:
+
+* **The scene-surprise detector works end to end on this perturbation.** It
+  fired in 5 of 5 episodes, on the first frame in which the displacement was
+  visible (2 ticks after it was applied), exactly once per episode, with a
+  surprise value of 0.11–0.15 against a threshold of 0.04. The runtime then
+  invalidated the plan, held for one tick and requested a fresh chunk.
+* **It made no difference to the task.** Every paired episode failed with every
+  controller, including the baseline that already replans every 10 ticks.
+  The same episodes mostly succeed without the displacement. The limiting factor
+  is the policy: this checkpoint was trained on LIBERO-Spatial's fixed layouts
+  and does not recover from a 5 cm object displacement, so replanning sooner
+  cannot help. **The value of scene-triggered refresh for task success is
+  therefore untested**, not demonstrated; testing it needs a policy that is
+  robust to scene changes.
+
+### 5.4 E4 — delayed inference (latency model: `calibrated` + delay)
+
++3 s added to every inference started between t = 1 s and t = 3 s; same
+overrides as E2; tasks 0–2, initial state 0. **Three pairs only — an
+illustration of behaviour, not a statistical result.** Files:
+`results/raw/e4_delay_shard0.jsonl`, `results/e4_delay.md`.
+
+| controller | episodes | successes | ticks without a valid action / episode | stale results rejected / episode | max latency (s) |
+|---|---|---|---|---|---|
+| `fixed_high` | 3 | 1 | 69.3 | 1.0 | 4.32 |
+| `physical_aware` | 3 | 1 | 46.0 | 0.0 | 3.96 |
+
+The delayed result arrived after its whole chunk had expired and was rejected in
+every `fixed_high` episode; the robot held still until the next result. Outcomes
+were identical in all three pairs.

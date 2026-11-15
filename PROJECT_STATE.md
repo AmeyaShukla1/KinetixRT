@@ -97,7 +97,58 @@ See [BENCHMARKS.md](BENCHMARKS.md). Raw data: `results/raw/*.jsonl`.
 
 ## 8. Known issues and limitations
 
-KNOWN_ISSUES_PLACEHOLDER
+Evidence and methodology
+
+1. **Small samples.** 20–23 paired episodes per configuration; success-rate
+   intervals are about ±20 pp. No success difference between the main
+   controllers is statistically resolved.
+2. **Closed-loop latency is modelled, not wall-clock.** The simulator does not
+   run in real time (≈0.2 s per simulated 50 ms step on this CPU), so closed-loop
+   runs use the simulator-locked executor with a stated latency model. The
+   threaded executor was measured only on replayed observations
+   (`krt-bench realtime`), not in closed loop.
+3. **One policy, one benchmark.** SmolVLA on LIBERO-Spatial: short, fixed-layout
+   pick-and-place tasks where ~45% of each episode lies near a gripper event.
+4. **The dynamic-scene experiment is uninformative for task success** because
+   the policy fails on displaced objects under every controller.
+5. Wall-clock model times in closed-loop tables were measured while several
+   benchmark processes shared four cores; only ratios are meaningful.
+6. The E1 result file contains episodes from two batches (an interrupted run and
+   its restart, hence a few extra episodes on initial state 2 and 10
+   `physical_precise` episodes); reports pair only episodes present for both
+   controllers.
+7. `fixed_matched` was defined after seeing the adaptive controller's inference
+   count (it is a post-hoc equal-compute baseline, and is labelled as such).
+
+Runtime
+
+8. **No real-time guarantees.** The threaded executor uses Python threads; the
+   control thread shares the GIL and the CPU cores with PyTorch. Measured jitter
+   is in BENCHMARKS.md §6. Nothing here is hard real-time or safety certified.
+9. A running inference cannot be cancelled. `stop()` waits up to 30 s, then
+   abandons the worker thread; its result is discarded when it finishes.
+10. The latency predictor is a per-step-count running average with linear
+    extrapolation; it has no model of contention onset, so the first inference
+    in a slow period is always under-predicted.
+11. Scene surprise assumes a static scene camera. It is suppressed for three
+    ticks when the robot starts moving and is masked where the arm itself is
+    moving, so a change next to the gripper can be missed. The threshold was
+    tuned on five recorded sequences.
+12. Phase rules depend on gripper commands in the predicted plan; a task without
+    gripper events has no "critical" phase. Thresholds are specific to this
+    policy and embodiment.
+13. The action validator clips, rate-limits and expires actions. It does no
+    collision, workspace or force checking.
+14. The dashboard is a single-process demo server (stdlib HTTP, no
+    authentication, binds to localhost). It is not a monitoring product.
+
+Environment
+
+15. Only software rendering (`MUJOCO_GL=osmesa`) was exercised; EGL is untested.
+16. `hf-libero` asks an interactive question on first import;
+    `ensure_libero_config()` writes its config file to avoid that.
+17. PyTorch was installed from PyPI (a CUDA build running on CPU); CPU-only
+    wheels were not tested.
 
 ## 9. Not implemented / unverified (do not assume these work)
 
