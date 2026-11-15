@@ -1,0 +1,11 @@
+{
+  "fixed_high": {"horizon": 25},
+  "fixed_reduced_steps": {"horizon": 25},
+  "runtime_only": {"horizon": 25},
+  "physical_aware": {
+    "steps_calm": 5, "horizon_calm": 40,
+    "steps_default": 5, "horizon_default": 25,
+    "steps_critical": 3, "horizon_critical": 10,
+    "event_window_pre": 30, "event_window_post": 8
+  }
+}
