@@ -144,3 +144,71 @@ Controllers:
 | `runtime_only` | 3 / 5 / 10 by deadline slack | 10 | Uses latency and buffer state only |
 | `physical_aware` | 5 calm, 10 near gripper events | 25 calm, 10 near events | + scene-surprise refresh, + deadline fit |
 | `physical_precise` | as above | 25 calm, **5** near events | Spends more near events |
+
+### 5.1 E1 — nominal conditions, synchronous protocol (latency model: `zero`)
+
+The control loop is not charged for inference time (the standard simulated
+evaluation protocol). This isolates the question "how much model work can be
+removed without hurting the task". Tasks 0–9 × initial states 0 and 1 (plus three
+episodes on initial state 2 from an interrupted earlier batch). Files:
+`results/raw/e1_zero_shard*.jsonl`, `results/e1_zero.md`.
+
+| controller | episodes | success (95% CI) | inferences / episode | denoising steps / episode | mean action age (ticks) |
+|---|---|---|---|---|---|
+| `fixed_high` | 23 | 47.8% (29–67) | 19.5 | 195 | 4.5 |
+| `fixed_reduced_steps` | 23 | 52.2% (33–71) | 18.8 | 56 | 4.5 |
+| `fixed_matched` | 20 | 65.0% (43–82) | 10.9 | 109 | 7.8 |
+| `physical_aware` | 23 | 52.2% (33–71) | 13.3 | 117 | 8.4 |
+| `fixed_long_horizon` | 23 | 17.4% (7–37) | 5.4 | 54 | 22.9 |
+| `physical_precise` | 10 | 40.0% (17–69) | 27.1 | 260 | 6.4 |
+
+Paired against `fixed_high`:
+
+| controller | pairs | success difference | wins / losses | McNemar p | inference ratio (95% CI) | denoising-step ratio | model wall-time ratio |
+|---|---|---|---|---|---|---|---|
+| `fixed_reduced_steps` | 23 | +4.3 pp | 1 / 0 | 1.00 | 0.96 (0.90–1.00) | 0.29 (0.27–0.30) | 0.69 (0.63–0.75) |
+| `physical_aware` | 23 | +4.3 pp | 5 / 4 | 1.00 | 0.68 (0.52–0.88) | 0.60 (0.45–0.78) | 0.65 (0.50–0.84) |
+| `fixed_matched` | 20 | +15.0 pp | 6 / 3 | 0.51 | 0.57 (0.44–0.76) | 0.57 (0.44–0.76) | 0.59 (0.45–0.81) |
+| `fixed_long_horizon` | 23 | −30.4 pp | 2 / 9 | 0.07 | 0.28 (0.23–0.35) | 0.28 (0.23–0.35) | 0.29 (0.24–0.37) |
+| `physical_precise` | 10 | −10.0 pp | 1 / 2 | 1.00 | 1.44 (0.99–1.99) | 1.39 (0.94–1.93) | 1.54 (1.02–2.14) |
+
+`physical_aware` paired against `fixed_matched` (20 pairs): success −10 pp
+(2 wins / 4 losses, p = 0.69), inference ratio 1.17 (0.92–1.45), model-time
+ratio 1.04 (0.79–1.31).
+
+What this shows:
+
+* **Fewer denoising steps are nearly free here.** 3 instead of 10 steps removed
+  71% of denoising work and 31% of model wall time; the outcome was identical in
+  22 of 23 pairs (and better in the remaining one). This matches §3: the step
+  count barely moves the actions. The saving in wall time is bounded by the
+  vision + prefix cost that every inference pays (§4).
+* **The physical-aware controller removed 32% of inferences and 35% of model
+  time with no measurable change in success** (5 wins, 4 losses).
+* **It did not beat a constant.** A fixed horizon of 17 removes as much work
+  (43% of inferences) with a success rate that is nominally higher and
+  statistically indistinguishable. On these tasks the evidence does not show
+  that *when* compute is saved (calm phases vs. uniformly) matters.
+* **Reuse has a limit.** Executing whole 50-action chunks open-loop cuts
+  inferences by 72% and loses most of the task success (2 wins, 9 losses,
+  p = 0.07; against `fixed_matched` 1 win / 10 losses, p = 0.01).
+* **Spending more near gripper events did not help.** `physical_precise`
+  (H = 5 near events) used 44% more inferences with no gain in 10 pairs.
+* **Success is not monotonic in the refresh horizon** in this sample
+  (H = 5-near-events 40%, H = 10 48%, H = 17 65%, H = 50 17%); with these sample
+  sizes the first three cannot be ranked. More frequent refresh is not
+  automatically better for a policy that samples a new noise vector at every
+  refresh (§3: two samples disagree more than a 5-tick-old plan does).
+
+Scene-surprise false alarms without any injected disturbance: 1 of 23
+`physical_aware` episodes had a plan invalidation (one invalidation at tick 52,
+in an episode that failed); 1 of 10 `physical_precise` episodes had four. Whether
+those were detector errors or real unexpected scene changes (for example a
+dropped object) was not determined.
+
+Phase split of `physical_aware`: 57% of ticks classified calm, 43% critical.
+Because the tasks are short pick-and-place motions, nearly half of every episode
+lies within the event windows, which caps what phase-based saving can achieve.
+
+Reproducibility: 12 episodes that ran twice in independent processes produced
+identical step counts, inference counts and outcomes.
