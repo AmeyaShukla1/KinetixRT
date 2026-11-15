@@ -1,0 +1,173 @@
+{
+  "hardware": {
+    "platform": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "cpu_count": 4,
+    "time_utc": "2026-11-15T15:59:39Z",
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "torch": "2.15.0+cu132",
+    "torch_threads": 4,
+    "cuda_available": false,
+    "lerobot": "0.7.0",
+    "git_commit": "6200b48"
+  },
+  "backend": {
+    "name": "smolvla-pytorch",
+    "model_id": "HuggingFaceVLA/smolvla_libero",
+    "device": "cpu",
+    "chunk_size": 50,
+    "action_dim": 7,
+    "default_steps": 10,
+    "supported_steps": [
+      3,
+      5,
+      10
+    ],
+    "is_real_model": true,
+    "extra": {
+      "params_million": 604.9,
+      "dtypes": [
+        "bfloat16",
+        "float32"
+      ],
+      "torch": "2.15.0+cu132",
+      "threads": 4,
+      "cameras": [
+        "image",
+        "image2"
+      ],
+      "use_cache": true,
+      "revision": null
+    }
+  },
+  "args": {
+    "command": "realtime",
+    "model": "HuggingFaceVLA/smolvla_libero",
+    "device": "cpu",
+    "threads": null,
+    "synthetic": false,
+    "controllers": [
+      "fixed_high",
+      "runtime_only"
+    ],
+    "control_hz": 20.0,
+    "duration": 40.0,
+    "frame_hold": 10,
+    "scheduler": "deadline",
+    "background_load": 0,
+    "load_start": 10.0,
+    "load_end": 20.0,
+    "out": "results/realtime_cpu_idle.json",
+    "func": "<function run at 0x7f96d411ccc0>"
+  },
+  "runs": [
+    {
+      "controller": "fixed_high",
+      "control_hz": 20.0,
+      "ticks": 800,
+      "fast_path_step_ms": {
+        "n": 800,
+        "mean": 1.7730922824988227,
+        "p50": 1.679094999985864,
+        "p95": 2.3467788999596446,
+        "p99": 2.7528226400056606,
+        "max": 9.512708999977804
+      },
+      "control_period_error_ms": {
+        "n": 800,
+        "mean": 0.29808698188546146,
+        "p50": 0.11537451570120538,
+        "p95": 1.592259226492841,
+        "p99": 3.1455917933033093,
+        "max": 3.9859480224322397
+      },
+      "inference_latency_s": {
+        "n": 16,
+        "mean": 2.428600533750007,
+        "p50": 2.4486827129999824,
+        "p95": null,
+        "p99": null,
+        "max": 2.62049623900009
+      },
+      "queue_wait_s": {
+        "n": 16,
+        "mean": 0.002082157875008761,
+        "p50": 0.002107690000002549,
+        "p95": null,
+        "p99": null,
+        "max": 0.0031253339999466334
+      },
+      "inferences": 16,
+      "mean_steps": 10.0,
+      "steps_histogram": {
+        "10": 16
+      },
+      "deadline_miss_ticks": 345,
+      "startup_wait_ticks": 53,
+      "stale_rejected": 0,
+      "sources": {
+        "fallback_startup": 53,
+        "chunk": 400,
+        "fallback_expired": 2,
+        "fallback_starved": 345
+      },
+      "mean_action_age_ticks": 70.3125,
+      "windows": {},
+      "marks": []
+    },
+    {
+      "controller": "runtime_only",
+      "control_hz": 20.0,
+      "ticks": 800,
+      "fast_path_step_ms": {
+        "n": 800,
+        "mean": 1.7665294287486688,
+        "p50": 1.6478300000244417,
+        "p95": 2.289258599927279,
+        "p99": 3.895279490027402,
+        "max": 6.062905000021601
+      },
+      "control_period_error_ms": {
+        "n": 800,
+        "mean": 0.34846659689961257,
+        "p50": 0.12097901952756729,
+        "p95": 2.058766102311437,
+        "p99": 2.7053622912171704,
+        "max": 4.6583530248653915
+      },
+      "inference_latency_s": {
+        "n": 28,
+        "mean": 1.364561412678577,
+        "p50": 1.3322985195000001,
+        "p95": 1.4416691858000432,
+        "p99": null,
+        "max": 2.438799736999954
+      },
+      "queue_wait_s": {
+        "n": 28,
+        "mean": 0.0019950762142733375,
+        "p50": 0.0018149369999491682,
+        "p95": 0.0023223277499710092,
+        "p99": null,
+        "max": 0.005219581000005746
+      },
+      "inferences": 28,
+      "mean_steps": 3.25,
+      "steps_histogram": {
+        "3": 27,
+        "10": 1
+      },
+      "deadline_miss_ticks": 51,
+      "startup_wait_ticks": 49,
+      "stale_rejected": 0,
+      "sources": {
+        "fallback_startup": 49,
+        "chunk": 700,
+        "fallback_starved": 51
+      },
+      "mean_action_age_ticks": 39.817142857142855,
+      "windows": {},
+      "marks": []
+    }
+  ]
+}

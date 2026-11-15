@@ -3,13 +3,13 @@
     "platform": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39",
     "python": "3.12.3",
     "cpu_count": 4,
-    "time_utc": "2026-11-15T09:01:21Z",
+    "time_utc": "2026-11-15T16:01:08Z",
     "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
     "torch": "2.15.0+cu132",
-    "torch_threads": 2,
+    "torch_threads": 4,
     "cuda_available": false,
     "lerobot": "0.7.0",
-    "git_commit": "574af44"
+    "git_commit": "6200b48"
   },
   "model_id": "HuggingFaceVLA/smolvla_libero",
   "checks": {
@@ -34,38 +34,48 @@
         50,
         7
       ],
-      "min": -1.048283338546753,
-      "max": 1.0092933177947998,
-      "fraction_outside_unit_box": 0.05714285714285714
+      "min": -1.046394944190979,
+      "max": 1.01118803024292,
+      "fraction_outside_unit_box": 0.054285714285714284
     },
     "step_sweep_vs_10": {
       "1": {
-        "max_abs": 1.8279478549957275,
-        "rms": 0.1959650069475174
+        "max_abs": 1.817436933517456,
+        "rms": 0.1922682523727417
       },
       "2": {
-        "max_abs": 1.8291096687316895,
-        "rms": 0.15544864535331726
+        "max_abs": 1.835029125213623,
+        "rms": 0.14818769693374634
       },
       "3": {
-        "max_abs": 1.6274964809417725,
-        "rms": 0.13006597757339478
+        "max_abs": 1.650124192237854,
+        "rms": 0.11976476013660431
       },
       "5": {
-        "max_abs": 0.5166651010513306,
-        "rms": 0.03309405967593193
+        "max_abs": 0.28381186723709106,
+        "rms": 0.021590569987893105
       },
       "20": {
-        "max_abs": 0.03725850582122803,
-        "rms": 0.007260015234351158
+        "max_abs": 0.03483003377914429,
+        "rms": 0.007197251543402672
       }
     },
     "reference_rollout_equivalence": {
       "pass": true,
-      "steps": 6,
+      "steps": 8,
       "max_observation_diff": 0.0,
       "max_action_diff": 0.0,
       "note": "lerobot make_env + prepare_canonical_observation + select_action vs LiberoSim + SmolVLABackend"
+    },
+    "chunked_execution_equivalence": {
+      "pass": true,
+      "ticks": 25,
+      "horizon": 10,
+      "reference_queue_refills": 3,
+      "runtime_inferences": 3,
+      "max_action_diff": 0.0,
+      "max_state_diff": 0.0,
+      "note": "lerobot select_action action queue (n_action_steps=10) vs KinetixRT Runtime + FixedController(10, 10), zero latency, same noise; reference actions clipped to [-1, 1] as the runtime's validator does"
     }
   },
   "backend": {
@@ -88,7 +98,7 @@
         "float32"
       ],
       "torch": "2.15.0+cu132",
-      "threads": 2,
+      "threads": 4,
       "cameras": [
         "image",
         "image2"
@@ -97,9 +107,9 @@
       "revision": null
     }
   },
-  "load_s": 9.7,
+  "load_s": 8.4,
   "checkpoint_file": "f52acf42e6587f01804b73de5dc4d9c749ad903d44089b95eba31ce105e169b9",
   "checkpoint_commit": "6721902bc4d61e50a3bfdb11dfb4cb626f05d102",
   "all_passed": true,
-  "rss_gb": 5.36568
+  "rss_gb": 5.606488
 }

@@ -1,0 +1,265 @@
+{
+  "hardware": {
+    "platform": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "cpu_count": 4,
+    "time_utc": "2026-11-15T15:58:05Z",
+    "cpu_model": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "torch": "2.15.0+cu132",
+    "torch_threads": 4,
+    "cuda_available": false,
+    "lerobot": "0.7.0",
+    "git_commit": "6200b48"
+  },
+  "backend": {
+    "name": "smolvla-pytorch",
+    "model_id": "HuggingFaceVLA/smolvla_libero",
+    "device": "cpu",
+    "chunk_size": 50,
+    "action_dim": 7,
+    "default_steps": 10,
+    "supported_steps": [
+      3,
+      5,
+      10
+    ],
+    "is_real_model": true,
+    "extra": {
+      "params_million": 604.9,
+      "dtypes": [
+        "bfloat16",
+        "float32"
+      ],
+      "torch": "2.15.0+cu132",
+      "threads": 4,
+      "cameras": [
+        "image",
+        "image2"
+      ],
+      "use_cache": true,
+      "revision": null
+    }
+  },
+  "args": {
+    "command": "realtime",
+    "model": "HuggingFaceVLA/smolvla_libero",
+    "device": "cpu",
+    "threads": null,
+    "synthetic": false,
+    "controllers": [
+      "fixed_high",
+      "runtime_only"
+    ],
+    "control_hz": 20.0,
+    "duration": 40.0,
+    "frame_hold": 10,
+    "scheduler": "deadline",
+    "background_load": 3,
+    "load_start": 10.0,
+    "load_end": 20.0,
+    "out": "results/realtime_cpu.json",
+    "func": "<function run at 0x7fbf23f098a0>"
+  },
+  "runs": [
+    {
+      "controller": "fixed_high",
+      "control_hz": 20.0,
+      "ticks": 799,
+      "fast_path_step_ms": {
+        "n": 799,
+        "mean": 1.8580982715913765,
+        "p50": 1.7373429999452128,
+        "p95": 2.443969399985235,
+        "p99": 4.819242700050365,
+        "max": 8.040136999966307
+      },
+      "control_period_error_ms": {
+        "n": 799,
+        "mean": 0.6153753730011849,
+        "p50": 0.13672600994141249,
+        "p95": 3.0000689058283325,
+        "p99": 5.6808242414263015,
+        "max": 104.35083300910719
+      },
+      "inference_latency_s": {
+        "n": 13,
+        "mean": 2.8882215209999824,
+        "p50": 2.636807425000029,
+        "p95": null,
+        "p99": null,
+        "max": 4.140372323999941
+      },
+      "queue_wait_s": {
+        "n": 13,
+        "mean": 0.0019285853846108343,
+        "p50": 0.0018048360000193497,
+        "p95": null,
+        "p99": null,
+        "max": 0.002635870999938561
+      },
+      "inferences": 13,
+      "mean_steps": 10.0,
+      "steps_histogram": {
+        "10": 13
+      },
+      "deadline_miss_ticks": 380,
+      "startup_wait_ticks": 57,
+      "stale_rejected": 0,
+      "sources": {
+        "fallback_startup": 57,
+        "chunk": 318,
+        "fallback_expired": 44,
+        "fallback_starved": 380
+      },
+      "mean_action_age_ticks": 71.24213836477988,
+      "windows": {
+        "before_load": {
+          "inferences": 4,
+          "mean_steps": 10.0,
+          "latency_s": {
+            "n": 4,
+            "mean": 2.7437299867499974,
+            "p50": 2.7907270189999736,
+            "p95": null,
+            "p99": null,
+            "max": 2.9173124160000725
+          }
+        },
+        "during_load": {
+          "inferences": 3,
+          "mean_steps": 10.0,
+          "latency_s": {
+            "n": 3,
+            "mean": 3.7187705916666496,
+            "p50": 4.025037707000024,
+            "p95": null,
+            "p99": null,
+            "max": 4.140372323999941
+          }
+        },
+        "after_load": {
+          "inferences": 6,
+          "mean_steps": 10.0,
+          "latency_s": {
+            "n": 6,
+            "mean": 2.569274675166639,
+            "p50": 2.561172779499941,
+            "p95": null,
+            "p99": null,
+            "max": 2.636807425000029
+          }
+        }
+      },
+      "marks": [
+        [
+          "load_on",
+          10.000094806999982
+        ],
+        [
+          "load_off",
+          20.02342983799997
+        ]
+      ]
+    },
+    {
+      "controller": "runtime_only",
+      "control_hz": 20.0,
+      "ticks": 799,
+      "fast_path_step_ms": {
+        "n": 799,
+        "mean": 1.8386107321665814,
+        "p50": 1.7031789999464308,
+        "p95": 2.417548300070393,
+        "p99": 3.8390502399738518,
+        "max": 26.065322000022206
+      },
+      "control_period_error_ms": {
+        "n": 799,
+        "mean": 0.7281177684513438,
+        "p50": 0.14618801606047782,
+        "p95": 3.5764980249609817,
+        "p99": 6.007058887007576,
+        "max": 101.56716600909022
+      },
+      "inference_latency_s": {
+        "n": 24,
+        "mean": 1.6358415477083146,
+        "p50": 1.4137495259999469,
+        "p95": 2.697379211399965,
+        "p99": null,
+        "max": 2.7097235989999717
+      },
+      "queue_wait_s": {
+        "n": 24,
+        "mean": 0.00187538704165983,
+        "p50": 0.0019234519999713484,
+        "p95": 0.002286737250005899,
+        "p99": null,
+        "max": 0.002296339000054104
+      },
+      "inferences": 24,
+      "mean_steps": 3.2916666666666665,
+      "steps_histogram": {
+        "3": 23,
+        "10": 1
+      },
+      "deadline_miss_ticks": 166,
+      "startup_wait_ticks": 54,
+      "stale_rejected": 0,
+      "sources": {
+        "fallback_startup": 54,
+        "chunk": 579,
+        "fallback_starved": 166
+      },
+      "mean_action_age_ticks": 45.39723661485319,
+      "windows": {
+        "before_load": {
+          "inferences": 7,
+          "mean_steps": 4.0,
+          "latency_s": {
+            "n": 7,
+            "mean": 1.7335815751428234,
+            "p50": 1.4857187009999961,
+            "p95": null,
+            "p99": null,
+            "max": 2.6981451179999567
+          }
+        },
+        "during_load": {
+          "inferences": 3,
+          "mean_steps": 3.0,
+          "latency_s": {
+            "n": 3,
+            "mean": 2.5781862930000066,
+            "p50": 2.693039074000012,
+            "p95": null,
+            "p99": null,
+            "max": 2.7097235989999717
+          }
+        },
+        "after_load": {
+          "inferences": 14,
+          "mean_steps": 3.0,
+          "latency_s": {
+            "n": 14,
+            "mean": 1.3850405171428406,
+            "p50": 1.393171011999982,
+            "p95": null,
+            "p99": null,
+            "max": 1.5054295840000123
+          }
+        }
+      },
+      "marks": [
+        [
+          "load_on",
+          10.000113585000008
+        ],
+        [
+          "load_off",
+          20.02785884100001
+        ]
+      ]
+    }
+  ]
+}

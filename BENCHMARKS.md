@@ -39,19 +39,25 @@ File: `results/validate_model.json`. All checks pass.
 | Pretrained weights loaded | 42 tensors sampled from the 788 in the checkpoint file compared with the loaded model: no mismatch |
 | Adapter vs. LeRobot reference inference (`predict_action_chunk`, same noise) | max abs difference **0.0** |
 | Determinism given the same noise | max abs difference 0.0 |
-| Output validity | shape (50, 7), finite; 5.7% of values outside [-1, 1] (clipped by the action validator) |
-| Reference rollout equivalence (LeRobot `make_env` + `select_action` vs. `LiberoSim` + `SmolVLABackend`, 6 steps) | observation difference 0.0, action difference 0.0 |
+| Output validity | shape (50, 7), finite; 5.4% of values outside [-1, 1] (clipped by the action validator) |
+| Reference rollout equivalence (LeRobot `make_env` + `select_action` vs. `LiberoSim` + `SmolVLABackend`, 8 steps) | observation difference 0.0, action difference 0.0 |
+| Chunked execution equivalence (LeRobot's own action queue with `n_action_steps=10` vs. the KinetixRT runtime with `FixedController(10, 10)` at zero latency, same noise, 25 ticks, 3 refreshes) | action difference **0.0**, state difference 0.0, same number of inferences |
 
 Step-count sweep on one real observation with the same initial noise (difference
 of the 50×7 chunk from the 10-step result):
 
 | denoising steps | 1 | 2 | 3 | 5 | 20 |
 |---|---|---|---|---|---|
-| RMS difference | 0.196 | 0.155 | 0.130 | 0.033 | 0.007 |
-| max abs difference | 1.83 | 1.83 | 1.63 | 0.52 | 0.04 |
+| RMS difference | 0.192 | 0.148 | 0.120 | 0.022 | 0.007 |
+| max abs difference | 1.82 | 1.84 | 1.65 | 0.28 | 0.03 |
 
 The large max-abs values at ≤3 steps are gripper commands flipping sign at a
 different index, not small numeric noise.
+
+The last row of the first table matters for §5: executing ten actions of a chunk
+through this runtime is bit-identical to LeRobot's own chunked execution, so the
+success differences between refresh horizons reported below are a property of
+the policy, not of the runtime's chunk handling.
 
 The opt-in model tests (`KRT_MODEL_TESTS=1 pytest tests/test_model.py`, 4 tests)
 repeat the adapter-equivalence and determinism checks and pass (136 s on this CPU).
@@ -121,6 +127,43 @@ dilated running map of the robot's own motion) was tuned on five recorded frame
 sequences (initial state 43) and then left fixed. Its end-to-end behaviour is
 reported with the closed-loop experiments: false alarms in §5.1, detection of an
 injected object displacement in §5.3.
+
+## 4. Inference latency on CPU (`krt-bench latency`)
+
+Idle machine, 4 PyTorch threads, real LIBERO observations from the recorded
+fixture, 20 timed repetitions per budget after 2 warm-ups. File:
+`results/latency_cpu.json`. The model has 604.9 M parameters (bfloat16 VLM,
+float32 action expert); the process used 3.9 GB of RAM.
+
+| denoising steps | p50 (ms) | p95 (ms) | vision, 2 cameras (ms) | prefix / KV build (ms) | denoising (ms) |
+|---|---|---|---|---|---|
+| 1 | 868 | 1046 | 556 | 203 | 102 |
+| 3 | 980 | 1076 | 516 | 184 | 259 |
+| 5 | 1100 | 1248 | 487 | 181 | 429 |
+| 10 (default) | 1508 | 1828 | 497 | 179 | 813 |
+| 20 | 2367 | 2583 | 495 | 179 | 1678 |
+
+Linear fit: latency ≈ 0.74 s + 0.080 s × steps. Pre- and post-processing take
+under 2 ms. With only 20 repetitions no p99 is reported.
+
+* About 0.68 s of every inference (45% at 10 steps) is the vision tower and the
+  prefix pass, which do not depend on the step count. Going from 10 to 3 steps
+  removes 70% of the denoising work but 35% of the latency.
+* When both cameras' vision features are reused (the vision-cache hit path),
+  10 steps take 1055 ms (−30%) and 3 steps 442 ms (−55%). §7 shows this path is
+  almost never taken on LIBERO.
+* At 20 Hz one inference spans 20 (3 steps) to 31 (10 steps) control ticks on
+  this CPU. A 50-action chunk can only be refreshed without gaps if latency stays
+  under about 25 ticks, so the 10-step budget is not sustainable here and the
+  3-step budget barely is. **On this hardware the policy cannot be run in real
+  time at its reference setting (one inference per tick) by a factor of ~30.**
+
+**Calibration used in the closed-loop latency experiments.** E2 and E4 (§5.2,
+§5.4) charge latency = 0.61 s + 0.071 s × steps. Those constants came from an
+earlier run of this benchmark on the same VM; the re-measurement reported above
+(after a VM restart) is 17–19% slower. The closed-loop latency experiments
+therefore model a CPU slightly faster than the one in this table; the regime
+(inference lasting 17–27 control ticks) is the same.
 
 ## 5. Closed-loop experiments (`krt-bench closed-loop`)
 
@@ -301,3 +344,83 @@ illustration of behaviour, not a statistical result.** Files:
 The delayed result arrived after its whole chunk had expired and was rejected in
 every `fixed_high` episode; the robot held still until the next result. Outcomes
 were identical in all three pairs.
+
+## 6. Runtime overhead and real-time behaviour (`krt-bench realtime`)
+
+**Fast-path cost in closed loop.** Per-tick cost of `Runtime.step` (analysis of
+two 360×360 camera frames, controller decision, buffer lookup, validation,
+telemetry), excluding model time, over all E1 episodes: median 1.5 ms per tick;
+the worst per-episode p95 was 18.7 ms while three benchmark processes competed
+for the four cores.
+
+**Threaded executor with the real model.** A 20 Hz control loop in the main
+thread and the model in a worker thread, for 40 s, on replayed real observations
+(no simulator, so no task outcome). Files: `results/realtime_cpu_idle.json`
+(idle machine), `results/realtime_cpu.json` (three CPU-burning processes started
+at t = 10 s and stopped at t = 20 s).
+
+| condition | controller | fast-path step p50 / p99 / max (ms) | control-period error p50 / p99 / max (ms) | inference latency p50 / max (s) | steps used | ticks driven by a plan |
+|---|---|---|---|---|---|---|
+| idle | `fixed_high` | 1.7 / 2.8 / 9.5 | 0.12 / 3.1 / 4.0 | 2.45 / 2.62 | 10 | 400 of 800 |
+| idle | `runtime_only` | 1.6 / 3.9 / 6.1 | 0.12 / 2.7 / 4.7 | 1.33 / 2.44 | 3 (27 of 28) | 700 of 800 |
+| CPU load | `fixed_high` | 1.7 / 4.8 / 8.0 | 0.14 / 5.7 / 104 | 2.64 / 4.14 | 10 | 318 of 799 |
+| CPU load | `runtime_only` | 1.7 / 3.8 / 26.1 | 0.15 / 6.0 / 102 | 1.41 / 2.71 | 3 (23 of 24) | 579 of 799 |
+
+* **The fast path does not block on inference.** While single inferences took
+  1.3–4.1 s, the longest control step took 9.5 ms on the idle machine and 26 ms
+  under CPU load.
+* **Timing is not hard real-time.** Under CPU load the control loop itself was
+  late by about 100 ms once in each run (operating-system scheduling on an
+  oversubscribed 4-core VM). Nothing in this repository prevents that.
+* **The Python threaded executor slows inference.** With the control loop
+  running in the same process, a 10-step inference took 2.45 s instead of the
+  1.51 s measured stand-alone (3 steps: 1.33 s vs. 0.98 s), i.e. +35% to +60%.
+  The control thread and PyTorch's worker threads share the interpreter lock and
+  the cores. This is the first measured argument in this project for moving the
+  fast path out of the model's process (or into native code); it was not acted on.
+* With a 2.45 s latency a fixed 10-step budget leaves the robot without a valid
+  action for 43% of the time; the latency-aware controller switches to 3 steps
+  after the first inference and brings that to 6% (21% under the load window).
+  Both numbers describe buffer coverage only, not task success.
+
+## 7. Cross-observation vision-feature reuse
+
+`VisionFeatureCache` reuses a camera's vision-tower output when the downsampled
+frame changed by less than a threshold since the cached one. Measured in closed
+loop with the cache enabled (`--vision-cache`; 6 episodes, tasks 0–2,
+`fixed_high` and `physical_aware`; `results/raw/e5_vision_cache.jsonl`):
+
+| | value |
+|---|---|
+| cache lookups | 114 |
+| hits | **0** |
+| rejected because the frame changed | 108 (the other 6 were the first lookup of a camera in an episode) |
+
+Both cameras change between any two refreshes while the arm moves (one is
+mounted on the wrist), so nothing is ever reused. The hit path is real and saves
+0.45 s per inference when it is taken (§4), but **on this benchmark it
+contributes nothing**. It could matter for a stationary robot waiting for an
+event, or for a static third-person camera if hits were allowed per camera at a
+looser threshold; neither was evaluated.
+
+## 8. Scheduler policies under multi-robot overload — SYNTHETIC
+
+**No model is executed in this benchmark.** `krt-bench scheduler` simulates N
+robots sharing one inference executor with an assumed service time
+(0.06 s + 0.007 s × steps), each requesting a refresh every 0.25 s for 1 s
+chunks, to exercise the queueing policies.
+It says nothing about real model performance. File: `results/scheduler_sim.json`.
+
+| streams | policy | result age p50 / p95 (s) | time without a valid action | mean steps |
+|---|---|---|---|---|
+| 1 | any | 0.13 / 0.16 | 0.1% | 10 |
+| 2 | fifo | 0.31 / 0.39 | 0.1% | 10 |
+| 2 | deadline | 0.20 / 0.35 | 0.1% | 10 |
+| 4 | fifo | 0.62 / 0.69 | 45.4% | 10 |
+| 4 | latest-only | 0.34 / 0.39 | 34.3% | 10 |
+| 4 | deadline | 0.23 / 0.34 | 3.2% | 10 |
+| 4 | deadline + step degradation | 0.23 / 0.36 | 0.3% | 8.8 |
+
+In the simulation, serving the stream closest to running out of actions and
+dropping superseded observations keeps four streams alive on an executor that
+FIFO saturates. This has not been run with several real policies.
