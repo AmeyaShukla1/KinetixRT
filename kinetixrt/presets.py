@@ -57,6 +57,8 @@ PRESETS: dict[str, dict] = {
     # Control for physical_h1: the same rule with the phases swapped (dense refresh in
     # calm phases, sparse near events). If this does as well, the phase signal is not what helps.
     "physical_h1_inverted": _phys(horizon_critical=5, horizon_default=5, horizon_calm=1, steps_calm=10),
+    # Control for physical_h2 with the phases swapped.
+    "physical_h2_inverted": _phys(horizon_critical=10, horizon_default=10, horizon_calm=2, steps_calm=10, steps_critical=5),
     # Ablations of the physical-aware rule set.
     "physical_no_phase": _phys(use_phase=False),
     "physical_no_scene": _phys(use_scene=False),
