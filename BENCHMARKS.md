@@ -121,3 +121,26 @@ dilated running map of the robot's own motion) was tuned on five recorded frame
 sequences (initial state 43) and then left fixed. Its end-to-end behaviour is
 reported with the closed-loop experiments: false alarms in §5.1, detection of an
 injected object displacement in §5.3.
+
+## 5. Closed-loop experiments (`krt-bench closed-loop`)
+
+Protocol common to all experiments: LIBERO-Spatial, 280-step limit, 20 Hz
+control, the benchmark's own stored initial states, success as reported by the
+simulator. Every controller sees the same task, initial state and model noise
+seed, so comparisons are paired. Comparisons use the exact McNemar test for
+success and a paired bootstrap for compute ratios. "Inference" = one model call
+producing a 50-action chunk; "horizon" H = actions executed before the next
+refresh is due.
+
+Controllers:
+
+| Name | Denoising steps | Refresh horizon H | Notes |
+|---|---|---|---|
+| `reference_replan` | 10 | 1 | The checkpoint's own setting (`n_action_steps=1`): one inference per tick |
+| `fixed_high` | 10 | 10 | Fixed baseline |
+| `fixed_reduced_steps` | 3 | 10 | Fixed, fewer steps |
+| `fixed_matched` | 10 | 17 | Fixed, chosen *after* seeing `physical_aware` to match its inference count |
+| `fixed_long_horizon` | 10 | 50 | Fixed, execute the whole chunk |
+| `runtime_only` | 3 / 5 / 10 by deadline slack | 10 | Uses latency and buffer state only |
+| `physical_aware` | 5 calm, 10 near gripper events | 25 calm, 10 near events | + scene-surprise refresh, + deadline fit |
+| `physical_precise` | as above | 25 calm, **5** near events | Spends more near events |
