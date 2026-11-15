@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=71"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kinetixrt"
+version = "0.1.0"
+description = "Adaptive, physical-world-aware inference runtime for robot foundation models"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+dependencies = ["numpy>=2.0,<2.3"]
+
+[project.optional-dependencies]
+# Real SmolVLA inference (PyTorch + LeRobot). Heavy: do not install on small laptops.
+model = ["lerobot[smolvla]==0.7.0"]
+# Closed-loop LIBERO simulation (Linux only).
+sim = ["lerobot[smolvla,libero]==0.7.0"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+krt-bench = "kinetixrt.bench.cli:main"
+krt-dashboard = "kinetixrt.dashboard.server:main"
+
+[tool.setuptools.packages.find]
+include = ["kinetixrt*"]
+
+[tool.setuptools.package-data]
+kinetixrt = ["dashboard/*.html", "bench/fixtures/*.npz"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "model: needs the real SmolVLA weights (set KRT_MODEL_TESTS=1)",
+    "sim: needs LIBERO (set KRT_SIM_TESTS=1)",
+]
+
+[tool.ruff]
+line-length = 140
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501", "B008"]
