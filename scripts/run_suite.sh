@@ -33,8 +33,10 @@ sharded e1_zero --latency zero --init-states 0 1 2 \
   --controllers fixed_high fixed_reduced_steps fixed_long_horizon physical_aware physical_precise
 
 # E2. edge regime: CPU-calibrated latency with an injected 2.5x contention window
+# (horizons and the physical preset are adapted to ~1 s latency: scripts/e2_overrides.json)
 sharded e2_edge --latency calibrated --scenario contention --contention-multiplier 2.5 --disturb-t0 1.0 --disturb-t1 7.0 \
-  --init-states 0 1 --controllers fixed_high fixed_reduced_steps runtime_only physical_aware
+  --init-states 0 1 --controllers fixed_high fixed_reduced_steps runtime_only physical_aware \
+  --controller-overrides "$(cat scripts/e2_overrides.json)"
 
 # E3. dynamic scene: the object of interest is displaced by 5 cm at tick 20
 sharded e3_dynamic --latency zero --scenario dynamic --perturb-tick 20 --perturb-dy 0.05 \
