@@ -11,7 +11,9 @@ benchmark tool, SDK and dashboard are implemented and were executed end to end
 with the real pretrained `HuggingFaceVLA/smolvla_libero` policy **on a CPU, in
 simulation**. Nothing has run on a GPU or a real robot. The central hypothesis
 was tested with small samples; the result is mixed and is stated in
-[BENCHMARKS.md §1](BENCHMARKS.md).
+[BENCHMARKS.md §1](BENCHMARKS.md): substantial compute reductions showed no
+measurable loss of task success, but it is not established that physical signals
+are the reason, and success rates are known only to about ±20 percentage points.
 
 ## 2. Components
 
@@ -38,12 +40,12 @@ On the CPU development VM (Ubuntu 24.04, Python 3.12):
 
 | Command | Verified |
 |---|---|
-| `make setup`, `make test`, `make demo` | Yes, including from a fresh clone with only numpy + pytest installed (40 tests pass, 4 model tests skipped) |
+| `make setup`, `make test`, `make demo` | Yes, including from a fresh clone with only numpy + pytest installed (41 tests pass, 4 model tests skipped; the clean-clone check was done at 40 tests, before one regression test was added) |
 | `make lint` | Yes |
 | `KRT_MODEL_TESTS=1 .venv/bin/python -m pytest tests/test_model.py` | Yes (4 tests, real model) |
 | `make validate-model` | Yes |
 | `make dashboard-libero` | Yes |
-| `make benchmark-scheduler`, `make benchmark-latency`, `make benchmark-realtime` | Yes |
+| `make benchmark-scheduler`, `make benchmark-latency DEVICE=cpu`, `make benchmark-realtime DEVICE=cpu` | Yes |
 | `krt-bench closed-loop`, `signals`, `report`, `record-obs` | Yes (these produced `results/`) |
 | `make setup-model` | The same install steps were run by hand in this VM; the target itself was not re-run from a clean machine |
 | `make benchmark`, `make benchmark-closed-loop`, `make suite` | Their constituent commands were run individually; the composite targets were not run end to end (hours of CPU time) |
@@ -84,7 +86,7 @@ different camera key names and was not used.
 
 ## 6. Test status
 
-* `make test`: 40 passed, 4 skipped (the skipped ones need the model).
+* `make test`: 41 passed, 4 skipped (the skipped ones need the model).
 * Model tests: 4 passed.
 * `ruff check`: clean.
 * Reproducibility: 12 closed-loop episodes that were run twice in independent
@@ -101,7 +103,16 @@ Evidence and methodology
 
 1. **Small samples.** 20–23 paired episodes per configuration; success-rate
    intervals are about ±20 pp. No success difference between the main
-   controllers is statistically resolved.
+   controllers is statistically resolved. The reference setting scored 10 of 10
+   on one set of initial states and 2 of 10 on the next.
+1a. **Absolute success is low and unexplained.** 45–65% on LIBERO-Spatial,
+   including the checkpoint's reference setting, versus roughly 90% reported in
+   the SmolVLA paper. The observation/action pipeline matches LeRobot's exactly;
+   the cause (software rendering, versions, evaluation details) was not found.
+   Check this first on a GPU machine with LeRobot's own evaluation script.
+1b. **Outcomes are sensitive to numerics.** Changing only the PyTorch thread
+   count changed the step count of one decision mid-episode and flipped 2 of 3
+   `physical_aware` episodes; 10 of 10 `fixed_high` episodes kept their outcome.
 2. **Closed-loop latency is modelled, not wall-clock.** The simulator does not
    run in real time (≈0.2 s per simulated 50 ms step on this CPU), so closed-loop
    runs use the simulator-locked executor with a stated latency model. The
@@ -164,11 +175,13 @@ Environment
 
 ## 10. Remaining work, in order of value
 
-1. Run `scripts/setup_cuda.sh` and `make gpu-benchmark` on the RTX 4090: does any
-   saving survive when inference is 10–100× faster and the latency constraint
-   disappears?
-2. Increase sample size to ≥100 paired episodes per configuration (minutes on a
-   GPU) to resolve the success differences that this CPU study could not.
+1. Run `scripts/setup_cuda.sh` and `make gpu-benchmark` on the RTX 4090. First
+   question: does LeRobot's own evaluation reach the published success rate
+   there? Second: does any saving survive when inference is 10–100× faster?
+2. Increase sample size to ≥100 paired episodes per configuration (feasible on a
+   GPU) for `reference_replan`, `physical_h2`, `physical_h2_inverted`,
+   `fixed_h5` and `fixed_high`. This is the experiment that decides whether the
+   phase signal matters; the CPU study could only show the direction.
 3. Add LIBERO-10 / LIBERO-Object and a task family with genuinely moving objects;
    the fixed-layout LIBERO-Spatial tasks make the policy fail on displaced
    objects regardless of the runtime.

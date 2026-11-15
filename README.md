@@ -16,6 +16,24 @@ code, in closed loop in the LIBERO MuJoCo benchmark.
 > (RTX 4090 target) is prepared but **has never been run**; no GPU performance is
 > claimed anywhere. No real robot was involved. See [PROJECT_STATE.md](PROJECT_STATE.md).
 
+## Results in brief (CPU, simulation, small samples)
+
+* The adapter and the runtime's chunk execution are bit-identical to LeRobot's
+  reference inference.
+* 3 instead of 10 denoising steps removed 31% of model time with the same task
+  outcome in 22 of 23 paired episodes.
+* Refreshing every 2 ticks near predicted gripper events and every 10 otherwise
+  matched the checkpoint's one-inference-per-tick setting (13 vs. 12 successes in
+  20 paired episodes) with 26% of its inferences.
+* It is **not** established that the physical signals are the reason: differences
+  to a phase-swapped control and to uniform refresh rates point the right way
+  but are not statistically significant, and success rates are only known to
+  about ±20 percentage points.
+* Scene-triggered refresh and cross-observation vision reuse brought no benefit
+  on this benchmark.
+
+Full numbers, methods and negative results: [BENCHMARKS.md](BENCHMARKS.md).
+
 ## Documents
 
 | File | Content |
@@ -121,7 +139,7 @@ same object backed by the synthetic test backend.
 
 | Command | What it measures | Needs |
 |---|---|---|
-| `validate-model` | Real weights loaded; adapter bit-identical to LeRobot's reference inference; reference rollout equivalence | model (+ LIBERO, or `--source fixture`) |
+| `validate-model` | Real weights loaded; adapter bit-identical to LeRobot's reference inference; reference rollout and chunked-execution equivalence | model (+ LIBERO, or `--source fixture`) |
 | `latency` | Per-budget latency percentiles, stage breakdown, memory, optional real CPU contention | model |
 | `signals` | Physical signals vs. measured error proxies | model + LIBERO |
 | `closed-loop` | Paired closed-loop comparison of compute controllers, scenarios nominal / dynamic / contention / delay | model + LIBERO |
@@ -130,7 +148,9 @@ same object backed by the synthetic test backend.
 | `report` | Aggregates JSONL results into tables with confidence intervals | nothing |
 | `record-obs` | Records the real-observation fixture used by model-only benchmarks | model + LIBERO |
 
-The full suite behind BENCHMARKS.md is `scripts/run_suite.sh` (hours on a CPU).
+The full suite behind BENCHMARKS.md is `scripts/run_suite.sh` (about a day on a
+4-core CPU). Controller presets (`fixed_high`, `reference_replan`, `physical_h2`,
+…) are defined in `kinetixrt/presets.py`.
 
 ## Repository layout
 
@@ -146,7 +166,7 @@ kinetixrt/
   dashboard/               live dashboard server, page and demo drivers
   sdk.py, presets.py       Runtime.from_pretrained, named controller presets
 tests/                     CPU-only suite + opt-in real-model tests
-scripts/                   suite runner, GPU setup and benchmark, calibration data collection
+scripts/                   suite runner, secondary analysis, GPU setup and benchmark, calibration data collection
 docker/                    CUDA image definition (unverified)
 results/                   measured results (raw JSONL + summaries)
 ```

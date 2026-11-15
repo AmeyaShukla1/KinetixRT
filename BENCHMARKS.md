@@ -28,7 +28,62 @@ hardware, library versions, git commit and full command-line arguments.
 
 ## 1. Summary of findings
 
-MAIN_SUMMARY_PLACEHOLDER
+The question: can a runtime allocate inference compute adaptively — fewer
+denoising steps, less frequent refresh, reuse — from physical and runtime
+signals, and save compute without hurting what the robot does?
+
+**Short answer: partly shown, mostly unresolved, and not yet attributable to
+"physical awareness".**
+
+What the measurements support:
+
+1. **The runtime is correct and does what it claims.** The adapter and the
+   runtime's chunk execution are bit-identical to LeRobot's reference inference
+   (§2). The control loop never waited for the model: its longest step was
+   9.5 ms while inferences took 1.3–4.1 s (§6). Stale results were rejected and
+   fallbacks engaged in every overload episode without an invalid command (§5.2).
+2. **Large compute reductions produced no measurable loss of task success.**
+   * 3 instead of 10 denoising steps: −71% denoising work, −31% model time, same
+     outcome in 22 of 23 paired episodes (§5.1).
+   * Phase-dependent refresh (every 2 ticks near predicted gripper events, every
+     10 otherwise) matched the checkpoint's reference setting — 13 vs. 12
+     successes in 20 paired episodes — with 26% of its inferences (95% CI
+     19–36%) (§5.5).
+3. **Under overload, latency-aware step reduction halves the time the robot has
+   no valid action** (88 → 41 control ticks per episode in simulation, §5.2;
+   43% → 6% of ticks in the threaded run, §6).
+
+What they do not support:
+
+4. **"No measurable loss" is a weak statement at this sample size.** With 20–23
+   paired episodes, a success rate is known to about ±20 percentage points. The
+   reference setting succeeded in 10 of 10 episodes on one set of initial states
+   and 2 of 10 on the next (§5.5). No success difference between the main
+   controllers is statistically significant.
+5. **It is not shown that physical signals are what makes saving safe.** In E1 a
+   constant refresh horizon saved as much as the physical-aware controller with
+   equal success (§5.1). In E6 the phase-aware rule did nominally better than
+   its phase-swapped control (5 wins / 1 loss) and than the nearest uniform rate
+   (5 / 2), which is the direction the hypothesis predicts, but neither is
+   significant (§5.5). Under a binding latency constraint the physical signals
+   added nothing over latency-only control (§5.2).
+6. **Negative results.** Scene-triggered refresh detected every injected object
+   displacement and changed no outcome, because the policy does not recover from
+   displaced objects (§5.3). Cross-observation vision reuse never hit (§7).
+   Refreshing more often near gripper events did not help in E1 (§5.1). No
+   run-time signal predicted task failure (§3). The Python threaded executor
+   slows inference by 35–60% (§6).
+7. **Nothing here is a GPU or real-robot result.** On this CPU the policy cannot
+   run in real time at its reference setting by a factor of about 30 (§4); the
+   closed-loop success numbers come from simulation with modelled latency.
+
+A caveat on absolute numbers: success rates in this repository are 45–65% on
+LIBERO-Spatial, including for the reference setting (60%, CI 39–78). The SmolVLA
+paper reports roughly 90% for this benchmark. The observation and action
+pipeline was verified against LeRobot's own (§2), and the cause of the gap was
+not determined (candidates: software rendering, simulator or library versions,
+evaluation details). All conclusions here are relative comparisons inside one
+setup.
 
 ## 2. Model validation (`krt-bench validate-model`)
 
@@ -187,6 +242,9 @@ Controllers:
 | `runtime_only` | 3 / 5 / 10 by deadline slack | 10 | Uses latency and buffer state only |
 | `physical_aware` | 5 calm, 10 near gripper events | 25 calm, 10 near events | + scene-surprise refresh, + deadline fit |
 | `physical_precise` | as above | 25 calm, **5** near events | Spends more near events |
+| `fixed_h2`, `fixed_h3`, `fixed_h5` | 10 | 2, 3, 5 | Uniform rates between the reference and `fixed_high` (§5.5) |
+| `physical_h1`, `physical_h2` | 5 calm, 10 near events | 5 calm / 1 near events; 10 calm / 2 near events | Phase-dependent refresh near the reference setting (§5.5) |
+| `physical_h1_inverted`, `physical_h2_inverted` | — | phases swapped | Controls: same rule, dense refresh in the *calm* phase |
 
 ### 5.1 E1 — nominal conditions, synchronous protocol (latency model: `zero`)
 
@@ -344,6 +402,68 @@ illustration of behaviour, not a statistical result.** Files:
 The delayed result arrived after its whole chunk had expired and was rejected in
 every `fixed_high` episode; the robot held still until the next result. Outcomes
 were identical in all three pairs.
+
+### 5.5 E6 — refresh rate against the checkpoint's reference setting (latency model: `zero`)
+
+The checkpoint ships with `n_action_steps = 1`: one inference per control tick.
+The fixed baseline of E1 (refresh every 10 actions) is therefore already a
+5-fold reduction of the reference compute. This experiment places the reference,
+uniform refresh rates between the two, and phase-dependent refresh rates on the
+same episodes. Tasks 0–9; initial state 0 for all controllers and initial state 1
+for five of them; single-threaded so that all runs share one numerical
+configuration. Files: `results/raw/e0_reference_*.jsonl`, `e6_frontier_*.jsonl`,
+`e8_*.jsonl`, `results/e6_frontier.md`.
+
+| controller | refresh rule | initial state 0 | initial state 1 | total (95% CI) | inferences / episode | inferences vs. reference (95% CI) |
+|---|---|---|---|---|---|---|
+| `reference_replan` | every tick | 10 / 10 | 2 / 10 | 12 / 20 = 60% (39–78) | 171 | 1.00 |
+| `fixed_h2` | every 2 | 7 / 10 | – | – | 79 | 0.80 (0.53–1.13) |
+| `fixed_h3` | every 3 | 6 / 10 | – | – | 64 | 0.65 (0.47–0.86) |
+| `fixed_h5` | every 5 | 5 / 10 | 5 / 10 | 10 / 20 = 50% (30–70) | 39 | 0.23 (0.17–0.31) |
+| `fixed_high` | every 10 | 7 / 10 | 2 / 10 | 9 / 20 = 45% (26–66) | 20 | 0.12 (0.09–0.15) |
+| `physical_h1` | every tick near gripper events, every 5 when calm | 7 / 10 | – | – | 88 | 0.89 (0.52–1.39) |
+| `physical_h1_inverted` | the same with the phases swapped | 8 / 10 | – | – | 92 | 0.93 (0.72–1.27) |
+| `physical_h2` | every 2 near events, every 10 (5 steps) when calm | 9 / 10 | 4 / 10 | 13 / 20 = 65% (43–82) | 45 | 0.26 (0.19–0.36) |
+| `physical_h2_inverted` | the same with the phases swapped | 6 / 10 | 3 / 10 | 9 / 20 = 45% (26–66) | 59 | 0.34 (0.26–0.45) |
+
+(Inference counts include failed episodes, which run to the 280-step limit; the
+ratios are paired per episode. The reference needs 98 inferences for a
+successful episode and 280 for a failed one.)
+
+Paired results for `physical_h2` (20 pairs each):
+
+| compared with | wins / losses | McNemar p | inference ratio (95% CI) |
+|---|---|---|---|
+| `reference_replan` | 3 / 2 | 1.00 | 0.26 (0.19–0.36) |
+| `physical_h2_inverted` (phase-swapped control) | 5 / 1 | 0.22 | 0.77 (0.54–1.08) |
+| `fixed_h5` (closest uniform compute) | 5 / 2 | 0.45 | 1.16 (0.86–1.50) |
+| `fixed_high` | 5 / 1 | 0.22 | 2.25 (1.68–2.84) |
+
+What this shows:
+
+* **The most favourable result for the hypothesis in this repository:**
+  refreshing every 2 ticks near predicted gripper events and every 10 ticks
+  otherwise matched the reference setting's success (13 vs. 12 of 20; 3 wins,
+  2 losses) with **26% of its inferences** (95% CI 19–36%).
+* **It is not established that the phase signal is the reason.** The same rule
+  with the phases swapped did worse (9 of 20; 5 wins / 1 loss for the correct
+  assignment) while using *more* inferences, and the closest uniform refresh
+  rate did worse too (10 of 20; 5 / 2). Both differences point in the direction
+  the hypothesis predicts; neither is statistically significant (p = 0.22 and
+  0.45).
+* **The reference setting is not reliably better than cheaper settings.** After
+  the first ten episodes it led every other controller (10 of 10, never beaten
+  in any pair). On the next ten (initial state 1) it succeeded twice. This is
+  the clearest illustration in the data of how misleading ten episodes are.
+* **Success is not a smooth function of the refresh rate.** On initial state 0:
+  every tick 10, every 2 ticks 7, every 3 ticks 6, every 5 ticks 5, every 10
+  ticks 7 of 10.
+* **Initial conditions dominate.** Initial state 1 is much harder than initial
+  state 0 for almost every controller (reference 2 vs. 10, `fixed_high` 2 vs. 7,
+  `physical_h2` 4 vs. 9). Variation between initial states is larger than any
+  difference between controllers measured here.
+
+SEC56_PLACEHOLDER
 
 ## 6. Runtime overhead and real-time behaviour (`krt-bench realtime`)
 

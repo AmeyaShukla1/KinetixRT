@@ -72,7 +72,37 @@ the integration and the evidence discipline.
 ## 5. Actual measured advantage
 
 <!-- MEASURED:BEGIN -->
-_To be filled from BENCHMARKS.md once the experiment suite has finished._
+Everything below was measured with the real SmolVLA LIBERO checkpoint **on a
+4-core CPU in simulation**; details, raw data and caveats are in
+[BENCHMARKS.md](BENCHMARKS.md). There is no GPU, edge-device or real-robot
+measurement.
+
+| Claim | Measurement | Strength of evidence |
+|---|---|---|
+| Fewer denoising steps cost nothing measurable | 3 vs. 10 steps: −71% denoising work, −31% model time, same task outcome in 22 of 23 paired episodes | Good for compute; success known to ±20 pp |
+| Refresh frequency can be cut far below the reference setting | Phase-dependent refresh reached 13 of 20 successes vs. 12 of 20 for one-inference-per-tick, with 26% of the inferences (CI 19–36%) | Compute ratio solid; success equivalence only within ±20 pp |
+| Physical signals are what makes the saving safe | Phase-aware rule vs. phase-swapped control: 5 wins / 1 loss; vs. nearest uniform rate: 5 / 2. In another experiment a constant horizon did as well as the physical-aware controller | **Not established** (p ≥ 0.2) |
+| Graceful behaviour under overload | Latency-aware step reduction halved the time without a valid action (88 → 41 ticks per episode); stale results rejected, no invalid command | Solid for buffer coverage; **no** measurable task-success gain |
+| Non-blocking control path | Longest control step 9.5 ms while inferences took 1.3–4.1 s | Solid on this CPU; not hard real-time (one ~100 ms overrun under load) |
+| Scene-change-triggered refresh | Detected 5 of 5 injected object displacements within the first visible frame | Detection solid; **no task benefit** (the policy fails on displaced objects regardless) |
+| Cross-observation vision reuse | 0 hits in 114 lookups on LIBERO | Negative |
+| Multi-robot scheduling | Deadline policy keeps 4 simulated streams alive where FIFO starves 45% | **Synthetic simulation only** |
+
+What this means commercially, stated plainly:
+
+* The measured advantage that is solid today is **"the same checkpoint at a
+  quarter to a third of the inference work, with no loss detectable at this
+  sample size"**, plus defined behaviour under overload. Most of that advantage
+  comes from two constants (fewer steps, a longer refresh horizon) that a
+  customer could also set by hand once they have a harness that tells them it is
+  safe. The harness is, at present, the more defensible part.
+* The differentiating claim — that *physical* signals let the runtime save more
+  than a well-chosen constant — is **not demonstrated**. The data lean that way
+  in one experiment and not in another.
+* The quantity `r` in §6 is therefore between 0.3 and 0.75 for this checkpoint on
+  this benchmark, with the upper part of that range resting on a success
+  equivalence known only to ±20 percentage points, and with no evidence yet that
+  it holds on a GPU, where inference may not be the binding constraint.
 <!-- MEASURED:END -->
 
 ## 6. Commercial ROI under transparent assumptions
