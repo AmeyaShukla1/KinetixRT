@@ -16,7 +16,9 @@ $BENCH latency --device cuda --repeats 200 --warmup 10 --cache --out results/lat
 $BENCH realtime --device cuda --control-hz 20 --duration 60 --out results/realtime_cuda_20hz.json
 $BENCH realtime --device cuda --control-hz 100 --duration 60 --out results/realtime_cuda_100hz.json
 # 4. closed loop: synchronous protocol and wall-clock-measured latency on this GPU
-CTRL="fixed_high fixed_reduced_steps fixed_long_horizon runtime_only physical_aware physical_precise"
+# The CPU study found the reference setting (one inference per tick) far ahead of every chunked
+# setting on task success, so the GPU run must include it and the settings between it and fixed_high.
+CTRL="reference_replan fixed_h2 fixed_h5 fixed_high fixed_matched fixed_reduced_steps runtime_only physical_h2 physical_h2_inverted physical_aware"
 $BENCH closed-loop --device cuda --latency zero --controllers $CTRL --init-states 0 1 2 3 4 --out results/raw/e1_zero_cuda.jsonl
 $BENCH closed-loop --device cuda --latency measured --controllers $CTRL --init-states 0 1 2 3 4 --out results/raw/e2_measured_cuda.jsonl
 $BENCH closed-loop --device cuda --latency measured --scenario dynamic --controllers fixed_high fixed_long_horizon physical_aware --init-states 0 1 2 --out results/raw/e3_dynamic_cuda.jsonl

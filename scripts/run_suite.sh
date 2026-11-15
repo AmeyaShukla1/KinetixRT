@@ -49,15 +49,31 @@ sharded e4_delay --latency calibrated --scenario delay --delay-s 3.0 --disturb-t
   --tasks 0 1 2 --init-states 0 --controllers fixed_high physical_aware \
   --controller-overrides "$(cat scripts/e2_overrides.json)"
 
+# E0/E6/E8. refresh-rate frontier against the checkpoint's reference setting (one inference per tick).
+# Single-threaded so that all controllers share one numerical configuration.
+sharded e0_reference --latency zero --threads 1 --init-states 0 --controllers reference_replan
+sharded e6_frontier --latency zero --threads 1 --init-states 0 \
+  --controllers fixed_high fixed_h5 fixed_h3 fixed_h2 physical_h1 physical_h2 physical_h1_inverted
+sharded e8_frontier_init1 --latency zero --threads 1 --init-states 1 \
+  --controllers physical_h2 fixed_high fixed_h5 physical_h2_inverted reference_replan
+sharded e8_inverted_init0 --latency zero --threads 1 --init-states 0 --controllers physical_h2_inverted
+
+# E5. vision-feature cache in closed loop; E7. one noise sample per episode (experimental)
+$BENCH closed-loop --device "$DEVICE" --threads 1 --latency zero --vision-cache --tasks 0 1 2 --init-states 0 \
+  --controllers fixed_high physical_aware --out results/raw/e5_vision_cache${TAG}.jsonl
+sharded e7_noise --latency zero --threads 1 --noise-mode episode --init-states 0 --controllers fixed_high fixed_matched
+
 # Model-only measurements (run alone: they need an otherwise idle machine)
 $BENCH latency --device "$DEVICE" --cache --out results/latency${TAG}.json
 $BENCH realtime --device "$DEVICE" --duration 40 --out results/realtime${TAG}.json
 $BENCH realtime --device "$DEVICE" --duration 40 --background-load 3 --out results/realtime_loaded${TAG}.json
 $BENCH scheduler --out results/scheduler_sim.json
 
-for e in e1_zero e2_edge e3_dynamic e4_delay; do
+for e in e1_zero e2_edge e3_dynamic e4_delay e7_noise; do
   $BENCH report results/raw/${e}${TAG}_shard*.jsonl --out results/${e}${TAG}.md
 done
+$BENCH report results/raw/e6_frontier${TAG}_shard*.jsonl results/raw/e0_reference${TAG}_shard*.jsonl results/raw/e8_*${TAG}_shard*.jsonl \
+  --baseline reference_replan --out results/e6_frontier${TAG}.md
 $BENCH report results/raw/signals_*${TAG}.jsonl --kind signals --out results/signals${TAG}.md
 for e in e1_zero e2_edge e3_dynamic e4_delay; do
   $PY scripts/extra_analysis.py results/raw/${e}${TAG}_shard*.jsonl > results/${e}${TAG}_extra.md
