@@ -463,7 +463,32 @@ What this shows:
   `physical_h2` 4 vs. 9). Variation between initial states is larger than any
   difference between controllers measured here.
 
-SEC56_PLACEHOLDER
+### 5.6 Smaller probes
+
+These are too small to support conclusions; they are reported so that nothing
+that was run is hidden.
+
+* **One noise sample per episode (E7, experimental `--noise-mode episode`).**
+  Idea: chunks differ a lot between noise draws (§3), so reusing one noise tensor
+  for every inference of an episode might make consecutive chunks more
+  consistent. Result on tasks 0–9, initial state 0: `fixed_high` 5 of 10 (fresh
+  noise: 7 of 10; 1 win / 3 losses), `fixed_matched` 6 of 10 (fresh noise, run
+  with 2 threads: 5 of 10). **No benefit.** Files:
+  `results/raw/e7_noise_shard*.jsonl`.
+* **2 cm object displacement (three episodes per controller).** `fixed_high`
+  succeeded in 2 of 3, `fixed_long_horizon` in 1 of 3; the scene-surprise value
+  reached 0.06–0.09 (threshold 0.04). The policy tolerates a 2 cm displacement
+  sometimes; a proper comparison at this size was not run. File:
+  `results/raw/e3b_probe_2cm.jsonl`.
+* **Sensitivity to numerics.** Re-running the same episodes with 1 instead of 2
+  PyTorch threads changed step counts by a few ticks and no outcome for
+  `fixed_high` (10 of 10 identical outcomes). For `physical_aware` (three
+  episodes, from the cache run in §7, in which the cache never hit) the same
+  change altered one step-count decision mid-episode and flipped 2 of 3
+  outcomes. With an identical configuration, 12 of 12 repeated episodes were
+  exactly reproduced. An adaptive controller adds decision points at which tiny
+  numerical differences can change the trajectory; a single episode outcome is
+  best read as one random draw.
 
 ## 6. Runtime overhead and real-time behaviour (`krt-bench realtime`)
 
@@ -544,3 +569,30 @@ It says nothing about real model performance. File: `results/scheduler_sim.json`
 In the simulation, serving the stream closest to running out of actions and
 dropping superseded observations keeps four streams alive on an executor that
 FIFO saturates. This has not been run with several real policies.
+
+## 9. Reproducing these results
+
+```bash
+make setup-model
+```
+
+```bash
+make validate-model
+```
+
+```bash
+bash scripts/run_suite.sh
+```
+
+The suite takes roughly a day on a 4-core CPU; individual experiments can be run
+with the `krt-bench closed-loop` invocations inside `scripts/run_suite.sh`. Runs
+are resumable (finished episodes are skipped) and shardable. Reports are
+regenerated with `krt-bench report <files> [--baseline <controller>]` and
+`python scripts/extra_analysis.py <files>`.
+
+Run-to-run differences to expect: wall-clock numbers depend on machine load;
+episode outcomes are exactly reproducible for an identical configuration and
+thread count, and can differ when either changes (§5.6).
+
+GPU: `scripts/setup_cuda.sh`, then `make gpu-check` and `make gpu-benchmark`.
+**These have not been run.** Results are written to separate `*_cuda` files.

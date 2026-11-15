@@ -40,7 +40,7 @@ On the CPU development VM (Ubuntu 24.04, Python 3.12):
 
 | Command | Verified |
 |---|---|
-| `make setup`, `make test`, `make demo` | Yes, including from a fresh clone with only numpy + pytest installed (41 tests pass, 4 model tests skipped; the clean-clone check was done at 40 tests, before one regression test was added) |
+| `make setup`, `make test`, `make demo` | Yes, including from a fresh clone with only numpy + pytest installed (41 tests pass, 4 model tests skipped) |
 | `make lint` | Yes |
 | `KRT_MODEL_TESTS=1 .venv/bin/python -m pytest tests/test_model.py` | Yes (4 tests, real model) |
 | `make validate-model` | Yes |

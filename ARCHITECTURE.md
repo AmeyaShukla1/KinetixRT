@@ -135,6 +135,10 @@ so that the new chunk lands when H actions of the current one have executed.
      positive evidence; otherwise `default`.
 2. **Budget per phase**: `(steps, horizon)`; shipped LIBERO preset: calm (5, 25),
    default/critical (10, 10); `physical_precise` uses critical (10, 5).
+   The setting that did best against the checkpoint's one-inference-per-tick
+   reference (BENCHMARKS.md §5.5) is the preset `physical_h2`: calm (5, 10),
+   near events (10, 2). Whether the phase split is what makes it work is not
+   established.
 3. **Scene surprise** (O_t): if the scene camera shows a localized change that
    recent activity in the same image region does not explain, the active plan is
    invalidated (`invalidate_before_tick`), a high-priority refresh is requested
