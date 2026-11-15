@@ -242,9 +242,10 @@ actions per inference; how many to execute before refreshing is exactly the
 
 The roadmap allows native code "when justified by evidence". Measured on the
 development CPU, the Python fast path costs well under 1 ms per tick with
-64×64 images and a few milliseconds with two 360×360 cameras (dominated by the
-numpy downsample; BENCHMARKS.md §6), against inference times of hundreds of
-milliseconds to seconds. A native scheduler would not change any result in this
+64×64 images and about 1.5 ms (median) with two 360×360 cameras, with a worst
+per-episode p95 below 20 ms while other benchmark processes competed for the
+same four cores (dominated by the numpy downsample; BENCHMARKS.md §6), against
+inference times of hundreds of milliseconds to seconds. A native scheduler would not change any result in this
 repository. The first native candidates, if profiling on a GPU shows the fast
 path matters at 100 Hz+, are the analyzer's downsample and the buffer.
 
