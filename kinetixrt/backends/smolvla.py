@@ -53,7 +53,12 @@ class SmolVLABackend(PolicyBackend):
         vision_cache: VisionFeatureCache | None = None,
         supported_steps: tuple[int, ...] = (3, 5, 10),
         seed: int = 0,
+        noise_mode: str = "fresh",
     ) -> None:
+        if noise_mode not in ("fresh", "episode"):
+            raise ValueError("noise_mode must be 'fresh' (new noise per inference, the reference behaviour) or 'episode'")
+        self.noise_mode = noise_mode
+        self._episode_noise: Any = None
         import torch
         from lerobot.policies import make_pre_post_processors
         from lerobot.policies.common.flow_matching import euler_integrate
@@ -150,12 +155,22 @@ class SmolVLABackend(PolicyBackend):
     def reset(self, seed: int | None = None) -> None:
         if seed is not None:
             self._gen = self._torch.Generator().manual_seed(int(seed))
+        self._episode_noise = None
         if self.vision_cache is not None:
             self.vision_cache.clear()
 
     def sample_noise(self) -> Any:
+        """Initial flow-matching noise for one inference.
+
+        ``noise_mode="episode"`` (experimental) reuses one noise tensor for every
+        inference of an episode instead of drawing a new one each time."""
         cfg = self.policy.config
-        return self._torch.randn((1, cfg.chunk_size, cfg.max_action_dim), generator=self._gen, dtype=self._torch.float32)
+        if self.noise_mode == "episode" and self._episode_noise is not None:
+            return self._episode_noise.clone()
+        noise = self._torch.randn((1, cfg.chunk_size, cfg.max_action_dim), generator=self._gen, dtype=self._torch.float32)
+        if self.noise_mode == "episode":
+            self._episode_noise = noise.clone()
+        return noise
 
     def make_batch(self, obs: Observation) -> dict[str, Any]:
         """Observation -> policy batch through LeRobot's own preprocessor."""

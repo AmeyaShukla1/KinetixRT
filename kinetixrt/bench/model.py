@@ -162,6 +162,54 @@ def validate_model(args: argparse.Namespace) -> None:
             "max_action_diff": act_diff,
             "note": "lerobot make_env + prepare_canonical_observation + select_action vs LiberoSim + SmolVLABackend",
         }
+
+        # 6. chunked execution equivalence: lerobot's own action queue with n_action_steps=H
+        #    vs. the KinetixRT runtime with FixedController(steps, H) at zero latency.
+        from kinetixrt.bench.common import make_latency_model, make_libero_runtime
+        from kinetixrt.intelligence.controller import FixedController
+
+        H, n_ticks = 10, args.chunked_steps
+        if n_ticks > 0:
+            saved = policy.config.n_action_steps
+            policy.config.n_action_steps = H
+            venv = make_env(cfg, n_envs=1)[args.suite][args.task]
+            try:
+                vobs, _ = venv.reset(seed=[0])
+                raw = sim.reset(init_state=0, seed=0)
+                policy.reset()
+                rt = make_libero_runtime(backend, FixedController(policy.config.num_steps, H), make_latency_model("zero"))
+                rt.reset(seed=1234, task=sim.task)
+                gen = torch.Generator().manual_seed(1234)
+                act_diff, obs_diff, refills = 0.0, 0.0, 0
+                for step in range(n_ticks):
+                    o = prepare_canonical_observation(vobs)
+                    o["task"] = list(venv.call("task_description"))
+                    obs_diff = max(obs_diff, float(np.abs(vobs["observation.state"][0] - raw["state"]).max()))
+                    noise = None
+                    if step % H == 0:  # lerobot refills its queue here: give it the noise our backend will draw
+                        noise = torch.randn((1, policy.config.chunk_size, policy.config.max_action_dim), generator=gen, dtype=torch.float32)
+                        refills += 1
+                    with torch.inference_mode():
+                        ref_a = policy.select_action(backend.pre(env_pre(o)), noise=noise)
+                    ref_a = env_post({"action": backend.post(ref_a)})["action"].float().cpu().numpy()
+                    out = rt.step(images=raw["images"], robot_state=raw["state"])
+                    act_diff = max(act_diff, float(np.abs(out.action - np.clip(ref_a[0], -1.0, 1.0)).max()))
+                    vobs, _, _, _, _ = venv.step(out.action[None])
+                    raw, _, _ = sim.step(out.action)
+                checks["chunked_execution_equivalence"] = {
+                    "pass": act_diff <= 1e-6 and obs_diff == 0.0 and len(rt.telemetry.inferences) == refills,
+                    "ticks": n_ticks,
+                    "horizon": H,
+                    "reference_queue_refills": refills,
+                    "runtime_inferences": len(rt.telemetry.inferences),
+                    "max_action_diff": act_diff,
+                    "max_state_diff": obs_diff,
+                    "note": "lerobot select_action action queue (n_action_steps=10) vs KinetixRT Runtime + FixedController(10, 10), zero latency, same noise; reference actions clipped to [-1, 1] as the runtime's validator does",
+                }
+            finally:
+                policy.config.n_action_steps = saved
+                policy.reset()
+                venv.close()
     report["all_passed"] = all(c.get("pass", True) for c in checks.values() if isinstance(c, dict))
     report["rss_gb"] = rss_gb()
     write_json(Path(args.out), report)
@@ -257,6 +305,7 @@ def add_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--suite", default="libero_spatial")
     p.add_argument("--task", type=int, default=0)
     p.add_argument("--rollout-steps", type=int, default=8)
+    p.add_argument("--chunked-steps", type=int, default=25, help="ticks of the chunked-execution equivalence check (0 = skip)")
     p.add_argument("--out", default=str(RESULTS / "validate_model.json"))
     p.set_defaults(func=validate_model)
 

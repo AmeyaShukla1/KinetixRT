@@ -40,7 +40,7 @@ def run(args: argparse.Namespace) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     done = _done_keys(out_path)
     cache = VisionFeatureCache(tau_mean=args.cache_tau_mean, tau_peak=args.cache_tau_peak) if args.vision_cache else None
-    backend = SmolVLABackend(args.model, device=args.device, num_threads=args.threads, vision_cache=cache)
+    backend = SmolVLABackend(args.model, device=args.device, num_threads=args.threads, vision_cache=cache, noise_mode=args.noise_mode)
     disturbances = []
     if args.scenario == "contention":
         disturbances = [Disturbance(t0=args.disturb_t0, t1=args.disturb_t1, multiplier=args.contention_multiplier)]
@@ -95,6 +95,7 @@ def run(args: argparse.Namespace) -> None:
                 "suite": args.suite,
                 "scenario": args.scenario,
                 "latency_model": args.latency,
+                "noise_mode": args.noise_mode,
                 "scale": args.scale,
                 "success": r.success,
                 "steps": r.steps,
@@ -146,6 +147,7 @@ def add_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--model", default="HuggingFaceVLA/smolvla_libero")
     p.add_argument("--device", default="auto")
     p.add_argument("--threads", type=int, default=None)
+    p.add_argument("--noise-mode", choices=["fresh", "episode"], default="fresh", help="'episode' reuses one noise tensor per episode (experimental)")
     p.add_argument("--suite", default="libero_spatial")
     p.add_argument("--tasks", type=int, nargs="+", default=list(range(10)))
     p.add_argument("--init-states", type=int, nargs="+", default=[0, 1, 2])
