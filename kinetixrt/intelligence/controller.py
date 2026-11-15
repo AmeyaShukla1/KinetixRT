@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from kinetixrt.core.action_buffer import BufferStatus
 from kinetixrt.core.scheduler import LatencyPredictor

@@ -124,6 +124,7 @@ def run(args: argparse.Namespace) -> None:
                 "max_action_jump": r.max_action_jump,
                 "fast_path_ms": latency_summary(s["fast_path_ms"]),
                 "perturbed_tick": r.extra.get("perturbed_tick"),
+                "surprise_max": max((t["surprise"] for t in rt.telemetry.ticks), default=0.0),
                 "invalidation_ticks": [e["tick"] for e in rt.telemetry.events if e["event"] == "plan_invalidated"],
                 "wall_s": r.wall_s,
                 "sim_wall_s": r.sim_wall_s,

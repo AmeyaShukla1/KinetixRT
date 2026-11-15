@@ -20,8 +20,9 @@ from kinetixrt.types import Observation
 class AnalyzerConfig:
     grid: int = 36
     """Images are area-averaged to grid x grid grayscale before differencing."""
-    cells: int = 6
-    """The grid is split into cells x cells blocks for localized change."""
+    cells: int = 9
+    """The grid is split into cells x cells blocks for localized change
+    (9 was the best of the settings compared on real LIBERO frames)."""
     scene_camera: str | None = None
     """Camera used for scene-surprise detection (ideally a static, external
     camera). Defaults to the first camera of the observation."""

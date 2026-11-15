@@ -110,6 +110,7 @@ class LiberoSim:
 
     # ----------------------------------------------------- scenario injection
     def object_of_interest(self) -> str | None:
+        self.env._ensure_env()
         inner = self.env._env.env
         names = list(getattr(inner, "obj_of_interest", []) or [])
         for n in names:

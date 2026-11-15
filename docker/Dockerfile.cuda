@@ -1,0 +1,39 @@
+# KinetixRT GPU environment: NVIDIA CUDA on Ubuntu, targeting an RTX 4090 (24 GB).
+#
+#   docker build -f docker/Dockerfile.cuda -t kinetixrt:cuda .
+#   docker run --rm --gpus all -it -v $PWD/results:/workspace/KinetixRT/results kinetixrt:cuda make gpu-check
+#
+# STATUS: this image definition has NOT been built or run on GPU hardware by the
+# authors' CI (the development VM has no GPU). Versions are pinned to the ones
+# validated on CPU; the CUDA 12.x PyTorch wheels are pulled from PyPI.
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    MUJOCO_GL=egl \
+    PYOPENGL_PLATFORM=egl \
+    HF_HOME=/workspace/.cache/huggingface \
+    UV_LINK_MODE=copy
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git curl ca-certificates build-essential cmake make \
+        libegl1 libgl1 libgles2 libglvnd0 libglib2.0-0 libosmesa6 ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# uv manages the Python 3.12 toolchain and the locked dependency set.
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+WORKDIR /workspace/KinetixRT
+COPY pyproject.toml requirements-cuda.txt README.md ./
+COPY kinetixrt ./kinetixrt
+RUN uv venv --python 3.12 /opt/venv \
+    && . /opt/venv/bin/activate \
+    && uv pip install -r requirements-cuda.txt \
+    && uv pip install -e . --no-deps
+ENV PATH="/opt/venv/bin:${PATH}" VIRTUAL_ENV=/opt/venv
+
+COPY . .
+# LIBERO asks for its config path interactively on first import; KinetixRT writes
+# the config file itself (kinetixrt.simulation.libero.ensure_libero_config).
+CMD ["make", "gpu-check"]

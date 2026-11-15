@@ -18,10 +18,10 @@ def libero_physical_config(**overrides) -> PhysicalPolicyConfig:
         steps_critical=10,
         horizon_calm=25,
         horizon_default=10,
-        horizon_critical=5,
+        horizon_critical=10,
         event_window_pre=12,
         event_window_post=8,
-        surprise_threshold=0.05,
+        surprise_threshold=0.04,
         surprise_action="hold",
     )
     base.update(overrides)
@@ -39,5 +39,13 @@ PRESETS: dict[str, dict] = {
     "fixed_long_horizon": {"type": "fixed", "num_steps": 10, "horizon": 50},
     "reference_replan": {"type": "fixed", "num_steps": 10, "horizon": 1},
     "runtime_only": {"type": "runtime_only", "step_options": (3, 5, 10), "default_steps": 10, "horizon": 10},
+    # Saves compute in calm phases, keeps the fixed_high budget near actuator events.
     "physical_aware": _phys(),
+    # Same, but refreshes twice as often near actuator events (spends more where it may matter).
+    "physical_precise": _phys(horizon_critical=5),
+    # Ablations of the physical-aware rule set.
+    "physical_no_phase": _phys(use_phase=False),
+    "physical_no_scene": _phys(use_scene=False),
+    "physical_steps_only": _phys(horizon_calm=10),
+    "physical_horizon_only": _phys(steps_calm=10),
 }

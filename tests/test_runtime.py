@@ -100,7 +100,7 @@ def test_adaptive_controllers_change_actual_compute(make_runtime):
     assert phys[0] < fixed[0], "physical-aware controller must spend fewer denoising steps on the toy task"
     slow = CalibratedLatency(0.1, 0.05)  # 10 steps = 0.6 s > 0.5 s refresh period
     rt_only = make_runtime(RuntimeOnlyController((3, 5, 10), 10, horizon=10), latency=slow)
-    r = run_episode(ToyPickPlace(ToyConfig(), 0), rt_only, "toy", seed=0, reset_kwargs={"seed": 0}, motion_dims=(0, 1))
+    run_episode(ToyPickPlace(ToyConfig(), 0), rt_only, "toy", seed=0, reset_kwargs={"seed": 0}, motion_dims=(0, 1))
     used = {i["steps"] for i in rt_only.telemetry.inferences}
     assert used - {10}, f"runtime-only controller should reduce steps under latency pressure, used {used}"
 

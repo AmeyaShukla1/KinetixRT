@@ -1,0 +1,11 @@
+# Pinned to the versions validated on CPU in this repository (see PROJECT_STATE.md).
+# On Linux x86_64 the PyPI torch wheel is the CUDA build (cu13x for torch 2.15),
+# which also runs on CPU. Requires an NVIDIA driver new enough for that CUDA
+# runtime (check `nvidia-smi`; the wheel bundles its own CUDA libraries).
+torch==2.15.0
+torchvision==0.29.2
+lerobot[smolvla,libero]==0.7.0
+transformers==5.22.2
+numpy==2.2.6
+mujoco==3.8.1
+pytest>=8
