@@ -37,6 +37,8 @@ PRESETS: dict[str, dict] = {
     "fixed_high": {"type": "fixed", "num_steps": 10, "horizon": 10},
     "fixed_reduced_steps": {"type": "fixed", "num_steps": 3, "horizon": 10},
     "fixed_long_horizon": {"type": "fixed", "num_steps": 10, "horizon": 50},
+    # Fixed baseline with roughly the same inference count as physical_aware.
+    "fixed_matched": {"type": "fixed", "num_steps": 10, "horizon": 17},
     "reference_replan": {"type": "fixed", "num_steps": 10, "horizon": 1},
     "runtime_only": {"type": "runtime_only", "step_options": (3, 5, 10), "default_steps": 10, "horizon": 10},
     # Saves compute in calm phases, keeps the fixed_high budget near actuator events.
