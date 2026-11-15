@@ -120,6 +120,7 @@ class Runtime:
         self._lock = threading.Lock()
         self._worker: threading.Thread | None = None
         self._running = False
+        self._epoch = 0  # bumped by stop(): results of an inference that outlives it are discarded
         self._task = ""
         self.telemetry.meta.update(
             backend=vars(backend.info).copy(),
@@ -157,15 +158,22 @@ class Runtime:
         if self.cfg.mode == "threaded" and not self._running:
             self.scheduler.reopen()
             self._running = True
-            self._worker = threading.Thread(target=self._worker_loop, name="krt-inference", daemon=True)
+            self._worker = threading.Thread(target=self._worker_loop, args=(self._epoch,), name="krt-inference", daemon=True)
             self._worker.start()
 
     def stop(self, timeout: float = 30.0) -> None:
         if self.cfg.mode == "threaded" and self._running:
             self._running = False
+            with self._lock:
+                self._epoch += 1
+                self._in_flight = None
             self.scheduler.close()
             if self._worker is not None:
                 self._worker.join(timeout)
+                if self._worker.is_alive():
+                    # An inference is still running. Its thread exits by itself and its
+                    # result is dropped (epoch check); it must never reach a later episode.
+                    self.telemetry.event("worker_stop_timeout", tick=self._tick)
             self._worker = None
 
     def reset(self, seed: int | None = None, task: str = "") -> None:
@@ -430,14 +438,16 @@ class Runtime:
                 self._virtual_deliver(now, tick)
 
     # threaded executor ----------------------------------------------------------
-    def _worker_loop(self) -> None:
-        while self._running:
+    def _worker_loop(self, epoch: int) -> None:
+        while self._running and self._epoch == epoch:
             req, dropped = self.scheduler.take_blocking(self.clock.now, timeout=0.05)
             for d in dropped:
                 self.telemetry.event("request_dropped", reason=d.reason, req_id=d.request.req_id, tick=self._tick)
             if req is None:
                 continue
             with self._lock:
+                if self._epoch != epoch:
+                    return
                 self._in_flight = req
             t_start = self.clock.now()
             try:
@@ -445,12 +455,16 @@ class Runtime:
             except Exception as exc:  # noqa: BLE001
                 self.telemetry.event("backend_error", tick=self._tick, error=repr(exc))
                 with self._lock:
-                    self._in_flight = None
+                    if self._epoch == epoch:
+                        self._in_flight = None
                 continue
             t_done = self.clock.now()
+            if self._epoch != epoch:
+                return  # stopped or reset while the model was running: discard
             self._install(req, result, t_start, t_done, t_done - t_start, self._tick)
             with self._lock:
-                self._in_flight = None
+                if self._epoch == epoch:
+                    self._in_flight = None
 
     # ------------------------------------------------------------------ summary
     def summary(self) -> dict:

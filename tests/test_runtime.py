@@ -139,6 +139,28 @@ def test_threaded_stop_start_and_reset(make_runtime, blank_obs):
     assert rt._worker is None
 
 
+def test_inference_outliving_stop_is_discarded(make_runtime, blank_obs):
+    backend = SyntheticBackend(base_latency_s=0.3, sleep=True)
+    rt = make_runtime(FixedController(10, 10), mode="threaded", backend=backend, control_dt=0.01)
+    rt.start()
+    rt.step(**_kw(blank_obs()))  # submits the first request
+    time.sleep(0.05)  # the worker is now inside the 300 ms inference
+    rt.stop(timeout=0.01)
+    assert rt.telemetry.counters.get("worker_stop_timeout", 0) == 1
+    rt.reset(seed=1)
+    rt.start()  # a new episode starts while the old inference is still running
+    time.sleep(0.4)  # the old inference has finished by now
+    assert len(rt.telemetry.inferences) == 0, "result from before stop() must not be installed"
+    assert not rt.buffer.status(0).has_chunk
+    sources = []
+    for _ in range(60):  # the new worker serves the new episode normally
+        sources.append(rt.step(**_kw(blank_obs())).source)
+        time.sleep(0.01)
+    assert ActionSource.CHUNK in sources
+    assert rt._worker is not None and rt._worker.is_alive()
+    assert any(i["accepted"] for i in rt.telemetry.inferences)
+
+
 def test_hot_swap_controller(make_runtime, blank_obs):
     rt = make_runtime(FixedController(10, 10))
     for _ in range(10):
